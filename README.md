@@ -5,7 +5,7 @@ Define delegates around types and records.
 ## Usage
 
 ```clojure
-[clj-delegate "0.1.3"]
+[clj-delegate "0.1.4"]
 ```
 
 
@@ -34,59 +34,59 @@ Define delegates around types and records.
     :goodbye))
 
 (let [record   (MyRecord. 1 2 3)
-      delegator (MyDelegate. record 4)]
+      delegate (MyDelegate. record 4)]
   ;; A record delegate is a record like any other record that stores
   ;; a delegate instance and supplementary fields.
-  (println delegator)
+  (println delegate)
   ;; => #clj_delegate.core_test.MyDelegate{:a 1, :b 2, :c 3, :d 4}
-  
-  ;; The underlying delegate instance stays accessible as the `delegate' field
-  (println (.delegate delegator))
+
+  ;; The underlying instance stays accessible as the `delegate' field
+  (println (.delegate delegate))
   ;; => #clj_delegate.explorations.MyRecord{:a 1, :b 2, :c 3}
-  
+
   ;; Note that this special field is not accessible via a keyword lookup
-  (println (:delegate delegator))
+  (println (:delegate delegate))
   ;; => nil
-  
+
   ;; Original methods are callable
-  (println (.my-method delegator))
+  (println (.my-method delegate))
   ;; => bonjour
-  
+
   ;; And can be redefined at will
-  (println (.my-other-method delegator))
+  (println (.my-other-method delegate))
   ;; => goodbye
-  
+
   ;; The same goes for fields : delegate fields are directly accessible to the
-  ;; the delegator.
-  (println (.a delegator))
-  (println (:a delegator))
+  ;; the delegate.
+  (println (.a delegate))
+  (println (:a delegate))
   ;; => 1
-  
+
   ;; And additionnal fields can be defined as well.
-  (println (.d delegator))
-  (println (:d delegator))
+  (println (.d delegate))
+  (println (:d delegate))
   ;; => 4
-  
-  ;; Any modification to the delegator (with the exception of its own fields)
+
+  ;; Any modification to the delegate (with the exception of its own fields)
   ;; impacts the underlying delegate. Here is an example using 'assoc'.
   ;; The same logic follows with dissoc, conj, cons, with-meta, etc...
-  (println (.delegate (assoc delegator :x :y)))
+  (println (.delegate (assoc delegate :x :y)))
   ;; => #clj_delegate.explorations.MyRecord{:a 1, :b 2, :c 3, :x :y}
-  
-  ;; More importantly, delegator equivalate their delegate
-  (println (= delegator record))
+
+  ;; More importantly, delegates are equal to the instance they wrap.
+  (println (= delegate record))
   ;; => true
-  
+
   ;; And derive from it in the default isa? hierarchy
   (println (isa? MyDelegate MyRecord))
   ;; => true
-  
+
   ;; By default all methods are forwarded to the delegate
   (println (meta (MyDelegate. (with-meta (MyRecord. 1 2 3)
                                          {:a :aa})
                               4)))
   ;; => {:a :aa}
-  
+
   ;; Except if the method has been redefined in the body of the delegate or
   ;; if it has been subject to a transform.
   )
@@ -130,7 +130,7 @@ Example:
 
 ```clojure
 [
-   ;; Our main strategy is to forward calls to the merge of the delegator and
+   ;; Our main strategy is to forward calls to the merge of the delegate and
    ;; its delegate.
    ['[java.util.Map
       clojure.lang.IHashEq
@@ -144,7 +144,7 @@ Example:
          `(~(emit-call m
               (emit-merge-with-delegate m
                 (:this m))))))]
-   
+
    ; seq and associative (except assoc)
    ['[[clojure.lang.Seqable seq []]
       [clojure.lang.Associative containsKey [k]]

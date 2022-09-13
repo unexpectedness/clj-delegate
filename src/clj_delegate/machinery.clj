@@ -1,12 +1,11 @@
 (ns clj-delegate.machinery
-  (:require [shuriken.core :refer [fully-qualify]]
+  (:require [shuriken.namespace :refer [fully-qualify]]
             [clj-delegate.reflect
-             :refer [get-basis is-record? protocol?
-                     parameter-names
-                     native-record-interfaces]
+             :refer [get-basis native-record-interfaces qualify-type]
              :as reflect]
             [clj-delegate.derive :refer [derive-delegate]]
-            [clj-delegate.specs :refer [merge-specs to-local-format]]))
+            [clj-delegate.specs :refer [merge-specs to-local-format]]
+            [weaving.core :refer :all]))
 
 (defn protocol-symbol-to-class-symbol
   "Converts from a fully qualified symbol denoting a protocol's ivar
@@ -36,7 +35,7 @@
   (let [fields (-> delegate resolve get-basis)]
     `(~(symbol (str delegate "Fields"))
         ~@(map (fn [field]
-                 `(~field [~'this]
+                 `(~(with-meta field {}) [~'this]
                           (~(symbol (str "." field))
                              (.delegate ~'this))))
                fields))))
@@ -56,7 +55,6 @@
                        (map ensure-namespaced-symbol)
                        (map protocol-symbol-to-class-symbol)
                        (remove '#{java.lang.Object})
-                       (cons 'clj_delegate.derive.Delegation)
                        vec)
         methods (->> local
                      (remove (fn [[[& _] method-specs]]
@@ -79,11 +77,16 @@
        methods
        {})))
 
+(defn update-meta [x k f & args]
+  (if (-> x meta (get k))
+    (with-meta x (apply update (meta x) k f args))
+    x))
+
 (defn define-delegate-fields-protocol [delegate]
   (let [fields (-> delegate resolve get-basis)]
     (eval `(defprotocol ~(symbol (str delegate "Fields"))
              ~@(map (fn [field]
-                      `(~field [~'this]))
+                      `(~(with-meta field {}) [~'this]))
                     fields)))
     nil))
 

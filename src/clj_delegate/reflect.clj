@@ -1,9 +1,16 @@
 (ns clj-delegate.reflect
+  (:use clojure.pprint)
   (:refer-clojure :exclude [methods satisfies? find-protocol-impl])
   (:require [clojure.reflect :refer [reflect]]
             [clojure.set :as set]
-            [weaving.core :refer [and| not| or|]]
-            [shuriken.core :refer [fully-qualify tree-seq-breadth index-by]]))
+            [clojure.string :as str]
+            [clojure.main :refer [demunge]]
+            [weaving.core :refer [and| not|]]
+            [shuriken.namespace :refer [fully-qualify unqualify]]
+            [shuriken.tree :refer [tree-seq-breadth]]
+            [shuriken.associative :refer [index-by]]
+            [threading.core :refer :all]
+            [weaving.core :refer :all]))
 
 (def native-record-interfaces
   '#{clojure.lang.IRecord
@@ -148,6 +155,8 @@
 (defn methods [proto-class-or-symbol]
   (let [proto-or-class (maybe-resolve proto-class-or-symbol)
         protos (index-by :on (protocols proto-or-class))
+        protos-dict (->> protos (map (fn [[k v]]
+                                       (let [decl-c (-> v :declaring-class)]))))
         methods-to-adapt (->> (base-ancestors proto-or-class)
                               (mapcat (comp :members reflect))
                               (map (fn [m]
@@ -155,30 +164,27 @@
                                               (-> m :parameter-types
                                                   parameter-names)]
                                            c (:declaring-class m)]
-                                       [k (or (some-> (get protos c)
-                                                      :var
-                                                      .sym
-                                                      fully-qualify)
+                                       [k (or (some-> (get protos c) :var (•- (<- (-> (str (-• .ns) "/" (-• .sym))
+                                                                                      symbol))))
                                               c)])))
                               (into {}))]
+    (when-not proto-or-class (throw (Exception. (format "Can't resolve %s" proto-class-or-symbol))))
     (->> (if (protocol? proto-or-class)
-             (:on-interface proto-or-class)
-             proto-or-class)
+           (:on-interface proto-or-class)
+           proto-or-class)
          reflect :members
          (filter #(instance? clojure.reflect.Method %))
          (map (fn [method]
                 (-> method
-                    (update-in [:name] #(-> % str
-                                            (clojure.string/replace \_ \-)
-                                            symbol))
+                    (update-in [:name] #(-> % str demunge symbol))
                     (assoc :protocol
-                      (get methods-to-adapt
-                           [(:name method)
-                            (-> method :parameter-types parameter-names)]
-                           (:declaring-class method)))))))))
+                           (let [p (get methods-to-adapt
+                                        [(:name method)
+                                         (-> method :parameter-types parameter-names)]
+                                        (:declaring-class method))]
+                             (get protos-dict p p)))))))))
 
 (defn all-methods [proto-class-or-symbol]
-  (base-ancestors proto-class-or-symbol)
   (->> (base-ancestors proto-class-or-symbol)
        (cons proto-class-or-symbol)
        reverse
@@ -192,3 +198,28 @@
    (:name method)
    (vec (interleave (:parameter-types method)
                     (-> method :params parameter-names)))])
+
+;; TODO: copied from shuriken.reflection instead. Fix dance.core
+(defn method
+  "Finds a method by reflection."
+  [klass nme parameter-types]
+  (let [klass (if (class? klass) klass (resolve (-> klass name symbol)))
+        m (-> (doto (.getDeclaredMethod klass (name nme)
+                                        (into-array Class parameter-types))
+                (.setAccessible true)))]
+    (fn [target & args]
+      (.invoke m target (to-array args)))))
+
+(defn static-method
+  "Finds a static method by reflection."
+  [class name parameter-types]
+  (let [m (method class name parameter-types)]
+    (partial m nil)))
+
+(def prim-class (static-method clojure.lang.Compiler 'primClass [clojure.lang.Symbol]))
+
+(defn qualify-type [declaring-class sym]
+  (-> sym (or-> (if-> resolve identity (<- nil))
+                (some-> prim-class .getName)
+                (->> (fully-qualify (-> declaring-class maybe-resolve
+                                        .getPackage .getName demunge symbol))))))

@@ -5,7 +5,7 @@
             [clj-delegate.transforms
              :refer [apply-transforms or| method?| abstraction?|]]
             [clj-delegate.reflect :refer [all-methods get-basis]]
-            [shuriken.core :refer [fully-qualify unqualify separate]]
+            [shuriken.namespace :refer [fully-qualify unqualify]]
             [flatland.ordered.map :refer [ordered-map]]))
 
 (def ^:private imap-cons

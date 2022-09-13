@@ -1,7 +1,11 @@
 (ns clj-delegate.specs
+  (:use clojure.pprint)
   (:require [clj-delegate.reflect :refer [parameter-names signature all-methods
-                                          caching-all-protocols]]
-            [shuriken.core :refer [fully-qualify index-by slice]]))
+                                          caching-all-protocols qualify-type]]
+            [clojure.main :refer [demunge]]
+            [shuriken.namespace :refer [fully-qualify]]
+            [shuriken.associative :refer [index-by]]
+            [shuriken.sequential :refer [slice]]))
 
 ;                   deftype specs   list of clojure.lang.Method   local format
 ; to-local-format                               • -------------------> •
@@ -17,8 +21,8 @@
      :params (vec params)
      :this this
      :body body
-     :return-type (or (some-> name meta :tag fully-qualify)
-                      (some-> meth :return-type fully-qualify)
+     :return-type (or (some-> name meta :tag symbol fully-qualify)
+                      (some-> meth :return-type symbol fully-qualify)
                       'java.lang.Object)
      :parameter-types (mapv #(or (-> %1 meta :tag)
                                  %2
@@ -81,7 +85,7 @@
 
 (defn to-deftype-specs [delegate formatted-specs]
   ;; convert from local format to defrecord/deftype quoted specs code
-  (let [delegate (fully-qualify delegate)]
+  (let [delegate     (fully-qualify delegate)]
     (if (-> formatted-specs meta :format (= :deftype-specs))
       formatted-specs
       (do (with-meta
@@ -96,12 +100,16 @@
                           ~@(for [{:keys [name params this body return-type
                                           parameter-types] :as m}
                                   methods]
-                              (concat
-                                [(with-meta name {:tag return-type})
-                                 (vec (cons (with-meta this {:tag delegate})
-                                            (map #(with-meta %1 {:tag %2})
-                                                 params parameter-types)))]
-                                body)))))))
+                              (do #_(pprint m)
+                                  
+                                  (concat
+                                   [(with-meta name {:tag (qualify-type 
+                                                           (:declaring-class m) return-type)})
+                                    (vec (cons (with-meta this {:tag delegate})
+                                               (map #(with-meta %1 {:tag (qualify-type
+                                                                          (:declaring-class m) %2)})
+                                                    params parameter-types)))]
+                                   body))))))))
             {:format :deftype-specs})))))
 
 (defn merge-specs [delegate & args]

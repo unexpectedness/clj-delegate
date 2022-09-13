@@ -1,5 +1,5 @@
 (ns clj-delegate.reflect-test
-  (:use clojure.pprint)
+  (:refer-clojure :exclude [methods])
   (:require [clojure.test :refer :all]
             [clj-delegate.reflect :refer :all]))
 
@@ -57,7 +57,7 @@
 
 (deftest test-protocols
   (binding [*ns* (find-ns 'clj-delegate.reflect-test)]
-    (are [x] (= (-> x protocols first :on)
-                'clj_delegate.reflect_test.Prot)
+    (are [x] (contains? (->> x protocols (map :on) set)
+                        'clj_delegate.reflect_test.Prot)
          Rec
          'Rec)))

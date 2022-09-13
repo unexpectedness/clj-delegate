@@ -21,5 +21,3 @@
              (isa? ParentRecord ChildRecord)))
       (is (= true
              (isa? ChildRecord Object))))))
-
-(run-tests)

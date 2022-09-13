@@ -1,5 +1,4 @@
 (ns clj-delegate.core
-  (:use clojure.pprint)
   (:require [clj-delegate.reflect :refer [is-record? caching-all-protocols]]
             [clj-delegate.type   :refer [emit-deftype-delegate]]
             [clj-delegate.record :refer [emit-defrecord-delegate]]
@@ -7,13 +6,7 @@
             [potemkin :refer [import-vars]]))
 
 (import-vars
-  [clj-delegate.derive
-   delegates?
-   instance-delegates?
-   delegates-or-isa?
-   instance-delegates-or-isa?
-   with-delegates
-   without-delegates])
+  [clj-delegate.derive delegates?])
 
 (defmacro defdelegate [name delegate fields & [maybe-vec & more]]
   (let [more (if more more [])

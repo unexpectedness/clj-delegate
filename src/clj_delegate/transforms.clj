@@ -1,12 +1,9 @@
 (ns clj-delegate.transforms
   (:use clojure.pprint)
   (:require [weaving.core]
-            [shuriken.core :refer [fully-qualify unqualify index-by]]
-            [clj-delegate.specs   :refer [to-deftype-specs to-local-format
-                                          parse-method-code]]
-            [clj-delegate.reflect :refer [protocol? signature parameter-names
-                                          caching-all-protocols all-methods
-                                          maybe-resolve]]))
+            [shuriken.associative :refer [index-by]]
+            [clj-delegate.specs   :refer [to-deftype-specs to-local-format]]
+            [clj-delegate.reflect :refer [signature maybe-resolve]]))
 
 (def or|  weaving.core/or|)
 (def and| weaving.core/and|)

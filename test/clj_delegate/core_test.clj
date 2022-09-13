@@ -4,7 +4,11 @@
             [clj-delegate.core :refer :all]
             [clj-delegate.fixtures :refer [Protocol ProtocolA ProtocolB
                                            map->Record]]
-            [shuriken.core :refer [thrown?]])
+            [shuriken.exception :refer [thrown?]]
+            [clj-delegate.reflect :reload true]
+            [clj-delegate.specs :reload true]
+            [clj-delegate.type :reload true]
+            [clj-delegate.machinery :reload true])
   (:import [clj_delegate.fixtures Type Record Interface]))
 
 ; (pprint
@@ -33,21 +37,7 @@
   (let [deleg (DelegateType. (Type. 1 2 3) 4)]
     (testing "inheritance & delegation"
       (testing "delegates?"
-        (is (delegates? (class deleg) Type)))
-      (testing "instance-delegates?"
-        (is (instance-delegates? Type deleg)))
-      (testing "delegates-or-isa?"
-        (is (delegates-or-isa? (class deleg) Type))
-        (is (delegates-or-isa? (class deleg) Object)))
-      (testing "instance-delegates-or-isa?"
-        (is (instance-delegates-or-isa? Type deleg))
-        (is (instance-delegates-or-isa? Object deleg)))
-      (testing "with-delegates + isa?"
-        (with-delegates
-          (is (isa? (class deleg) Type))
-          (is (isa? (class deleg) Object))
-          (is (instance? Type deleg))
-          (is (instance? Object deleg)))))
+        (is (delegates? (class deleg) Type))))
     (testing "methods"
       (testing "multiple interfaces or protocols"
         (is (= :value (.method-c deleg :_))))
@@ -279,5 +269,3 @@
         (is (not (thrown? Throwable
                    (defdelegate ADelegate3 clj_delegate.fixtures.Record
                      []))))))))
-
-(run-tests)

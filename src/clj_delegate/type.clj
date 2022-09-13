@@ -5,7 +5,7 @@
             [clj-delegate.transforms :refer [apply-transforms]]
             [clj-delegate.reflect :refer [all-methods]
              :as reflect]
-            [shuriken.core :refer [unqualify]]))
+            [shuriken.namespace :refer [unqualify]]))
 
 (defn- emit-deftype [name delegate fields transforms delegator-specs]
   (emit-with emit-deftype*
