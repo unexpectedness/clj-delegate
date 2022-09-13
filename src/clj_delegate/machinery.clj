@@ -1,14 +1,12 @@
 (ns clj-delegate.machinery
-  (:require [clj-delegate.reflect
+  (:require [shuriken.core :refer [fully-qualify]]
+            [clj-delegate.reflect
              :refer [get-basis is-record? protocol?
                      parameter-names
                      native-record-interfaces]
              :as reflect]
             [clj-delegate.derive :refer [derive-delegate]]
-            [clj-delegate.specs :refer [merge-specs to-local-format]]
-            [shuriken.core :refer [fully-qualify or?]]))
-
-
+            [clj-delegate.specs :refer [merge-specs to-local-format]]))
 
 (defn protocol-symbol-to-class-symbol
   "Converts from a fully qualified symbol denoting a protocol's ivar
@@ -58,14 +56,24 @@
                        (map ensure-namespaced-symbol)
                        (map protocol-symbol-to-class-symbol)
                        (remove '#{java.lang.Object})
+                       (cons 'clj_delegate.derive.Delegation)
                        vec)
         methods (->> local
-                     (remove (fn [[[_method-name _params] method-specs]]
-                               (:no-method method-specs)))
+                     (remove (fn [[[& _] method-specs]]
+                               (or (:no-method method-specs)
+                                   (= 'wait (:name method-specs))))) ;; TODO: cleaner
                      (map (fn [[k v]]
                             `(~(:name v) ~(->> v :params (cons 'this) vec)
                                 ~@(:body v)))))
         fields (->> fields (cons 'delegate) vec)]
+    ;; To find duplicate methods, uncomment
+    ; (println (->> methods
+    ;              (filter #(-> % first (= 'forEach)))
+    ;              (map #(-> % first meta :tag))))
+    ; (clojure.pprint/pprint
+    ;   (->> (map (juxt first second) methods)
+    ;        (group-by identity)
+    ;        (filter #(> (count (second %)) 1))))
     (f name gname
        fields protocols
        methods
@@ -119,5 +127,3 @@
                          ensure-namespaced-symbol
                          protocol-symbol-to-class-symbol)
                     ~delegate))
-
-

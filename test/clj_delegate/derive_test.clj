@@ -1,8 +1,8 @@
 (ns clj-delegate.derive-test
   (:require [clojure.test :refer :all]
-            [clj-delegate.derive :refer :all])
+            [clj-delegate.derive :refer :all]
+            [clj-delegate.fixtures])
   (:import [clj_delegate.fixtures Record ParentRecord ChildRecord]))
-  
 
 (deftest test-derive-delegate
   (binding [*ns* (find-ns 'clj-delegate.machinery-test)]
@@ -21,3 +21,5 @@
              (isa? ParentRecord ChildRecord)))
       (is (= true
              (isa? ChildRecord Object))))))
+
+(run-tests)

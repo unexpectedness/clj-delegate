@@ -1,8 +1,9 @@
 (ns clj-delegate.reflect
   (:refer-clojure :exclude [methods satisfies? find-protocol-impl])
   (:require [clojure.reflect :refer [reflect]]
-            [shuriken.core :refer [fully-qualify and? not? or? tree-seq-breadth
-                                   index-by]]))
+            [clojure.set :as set]
+            [weaving.core :refer [and| not| or|]]
+            [shuriken.core :refer [fully-qualify tree-seq-breadth index-by]]))
 
 (def native-record-interfaces
   '#{clojure.lang.IRecord
@@ -25,10 +26,11 @@
     (symbol (.getName x))
     x))
 
-(defn maybe-resolve [class-or-symbol]
-  (if (symbol? class-or-symbol)
-    (resolve class-or-symbol)
-    class-or-symbol))
+(defn maybe-resolve [proto-class-or-symbol]
+  (if (symbol? proto-class-or-symbol)
+    (let [x (resolve proto-class-or-symbol)]
+      (if (var? x) (deref x) x))
+    proto-class-or-symbol))
 
 (defn maybe-deref [x]
   (if (var? x)
@@ -41,8 +43,8 @@
 (defn parameter-names [parameter-types]
   (vec (take (count parameter-types)
              (for [x alphabet
-                   xx alphabet]
-               (symbol (str x xx))))))
+                   y alphabet]
+               (symbol (str x y))))))
 
 (defn protocol? [symbol-or-proto]
   (let [proto (if (symbol? symbol-or-proto)
@@ -51,8 +53,8 @@
                   (catch Throwable t))
                 symbol-or-proto)]
     (try
-      (= (-> proto keys sort)
-         [:method-builders :method-map :on :on-interface :sigs :var])
+      (set/subset? #{:method-builders :method-map :on :on-interface :sigs :var}
+                   (-> proto keys set))
       (catch Throwable t
         false))))
 
@@ -86,21 +88,32 @@
   (boolean (find-protocol-impl (maybe-resolve proto-or-sym) x)))
 
 (defn ns-protocols [ns]
-  (->> (ns-map ns)
+  (->> (ns-interns ns)
        (keep (fn [[k v]]
-               (when (var? v)
-                 (deref v))))
+               (when (var? v) (deref v))))
        (filter protocol?)))
+
+(def ^:dynamic *all-protocols* nil)
+
+(defn all-protocols []
+  (set (or *all-protocols* (mapcat ns-protocols (all-ns)))))
+
+(defmacro caching-all-protocols [& body]
+  `(let [body-f# (fn [] ~@body)]
+     (if *all-protocols*
+       (body-f#)
+       (binding [*all-protocols* (all-protocols)]
+         (body-f#)))))
 
 (defn protocols [class-or-symbol]
   (filter #(satisfies? % (maybe-resolve class-or-symbol))
-          (ns-protocols *ns*)))
+          (all-protocols)))
 
 (defn get-basis [x]
   (. (. (ensure-class x) getMethod "getBasis" nil) invoke nil nil))
 
-(defn is-record? [symbol]
-  (contains? (:bases (reflect (resolve symbol)))
+(defn is-record? [sym]
+  (contains? (:bases (reflect (resolve sym)))
              'clojure.lang.IRecord))
 
 (defn public-method? [method]
@@ -115,23 +128,27 @@
 (defn base-ancestors
   "Like ancestors, but in breadth-first order, from low to high in the
   class hierarchy."
-  [class-or-symbol]
+  [proto-class-or-symbol]
   (distinct
     (rest (tree-seq-breadth
             ;; branch?
             (fn [class]
-              (let [bases (:bases (reflect class))]
+              (let [bases (and class (:bases (reflect class)))]
                 (not (or (nil? bases) (empty? bases)))))
             ;; children
             (fn [class]
               (->> class reflect :bases (map resolve)))
             ;; start-point
-            (maybe-resolve class-or-symbol)))))
+            (let [x (maybe-resolve proto-class-or-symbol)]
+              (if (protocol? x)
+                (:on-interface x)
+                x))))))
 
 
-(defn methods [class-or-symbol]
-  (let [protos (index-by :on (protocols class-or-symbol))
-        methods-to-adapt (->> (base-ancestors class-or-symbol)
+(defn methods [proto-class-or-symbol]
+  (let [proto-or-class (maybe-resolve proto-class-or-symbol)
+        protos (index-by :on (protocols proto-or-class))
+        methods-to-adapt (->> (base-ancestors proto-or-class)
                               (mapcat (comp :members reflect))
                               (map (fn [m]
                                      (let [k [(:name m)
@@ -144,7 +161,9 @@
                                                       fully-qualify)
                                               c)])))
                               (into {}))]
-    (->> (maybe-resolve class-or-symbol)
+    (->> (if (protocol? proto-or-class)
+             (:on-interface proto-or-class)
+             proto-or-class)
          reflect :members
          (filter #(instance? clojure.reflect.Method %))
          (map (fn [method]
@@ -158,11 +177,18 @@
                             (-> method :parameter-types parameter-names)]
                            (:declaring-class method)))))))))
 
-(defn all-methods [class-or-symbol]
-  (->> (base-ancestors class-or-symbol)
-       (cons class-or-symbol)
+(defn all-methods [proto-class-or-symbol]
+  (base-ancestors proto-class-or-symbol)
+  (->> (base-ancestors proto-class-or-symbol)
+       (cons proto-class-or-symbol)
        reverse
        (mapcat methods)
-       (filter (and? #(instance? clojure.reflect.Method %)
+       (filter (and| #(instance? clojure.reflect.Method %)
                      public-method?
-                     (not? static-method?)))))
+                     (not| static-method?)))))
+
+(defn signature [method]
+  [(:return-type  method)
+   (:name method)
+   (vec (interleave (:parameter-types method)
+                    (-> method :params parameter-names)))])

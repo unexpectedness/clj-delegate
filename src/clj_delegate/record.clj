@@ -1,7 +1,9 @@
 (ns clj-delegate.record
+  (:use clojure.pprint)
   (:require [clj-delegate.machinery :refer :all]
             [clj-delegate.specs :refer [merge-specs]]
-            [clj-delegate.transforms :refer [apply-transforms]]
+            [clj-delegate.transforms
+             :refer [apply-transforms or| method?| abstraction?|]]
             [clj-delegate.reflect :refer [all-methods get-basis]]
             [shuriken.core :refer [fully-qualify unqualify separate]]
             [flatland.ordered.map :refer [ordered-map]]))
@@ -13,7 +15,7 @@
   `(~(symbol (str \. (:name method)))
       ~call-on
       ~@(:params method)))
-  
+
 (defn- emit-merge-with-delegate [method x]
   `(merge ~'delegate ~x))
 
@@ -21,7 +23,7 @@
   `(ordered-map ~@(apply concat (seq om))))
 
 (defn- produce-fields-map [this-sym fields]
-  (into (ordered-map)
+  (into (ordered-map) ;; TODO: array-map ?
         (for [f fields]
           `[~(keyword f)
             (~(symbol (str \. f)) ~this-sym)])))
@@ -71,7 +73,7 @@
                              (case k#
                                :delegate                      :delegate
                                ~(emit-fields-keywords fields) :for-delegator
-                                                              :for-delegate)) 
+                                                              :for-delegate))
                            fields-map#))
          original-fields-map# ~(emit-fields-map
                                  (:this method)
@@ -92,7 +94,98 @@
               [:delegate new-delegate#]))))
 
 (defn- record-transforms [delegator-name delegate-name fields]
-  [
+  {;; Our main strategy is to forward calls to the merge of the delegator and
+   ;; its delegate.
+   (or| (abstraction?| java.util.Map
+                       clojure.lang.IHashEq
+                       clojure.lang.ILookup
+                       java.io.Serializable
+                       java.lang.Iterable)
+        (method?| '[clojure.lang.IPersistentCollection count []]
+                  '[clojure.lang.IPersistentCollection equiv []]))
+   (fn [m]
+     (assoc m :body
+       `(~(emit-call
+            m (emit-merge-with-delegate
+                m (:this m))))))
+
+   ;; seq and associative (except assoc)
+   (method?| '[clojure.lang.Seqable seq []]
+             '[clojure.lang.Associative containsKey [k]]
+             '[clojure.lang.Associative entryAt [k]])
+   (fn [m]
+     (assoc m :body
+       `(~(emit-call
+            m (emit-merge-with-delegate
+                m (emit-fields-map (:this m) fields))))))
+
+   ;; cons
+   (method?| '[clojure.lang.IPersistentCollection cons [x]])
+   (fn [method]
+     (assoc method :body
+       `(~(emit-map-operation method delegator-name delegate-name fields
+                              imap-cons))))
+
+   ;; assoc
+   (method?| '[clojure.lang.Associative assoc [k v]])
+   (fn [method]
+     (assoc method
+       :body
+       `(~(emit-map-operation method delegator-name delegate-name fields
+                              assoc))
+       :protocol 'clojure.lang.IPersistentMap
+       :return-type 'clojure.lang.IPersistentMap))
+
+   ;; without
+   (method?| '[clojure.lang.IPersistentMap without [k]])
+   (fn [method]
+     (assoc method :body
+       `((let [k# ~@(:params method)
+               delegator-fields# (quote ~fields)
+               delegate-fields# (get-basis ~(fully-qualify delegate-name))
+               common-fields# (set (map keyword
+                                        (concat delegate-fields#
+                                                delegator-fields#)))]
+           ;; If the key to dissoc is a delegate or a delegator field ...
+           (if (contains? common-fields# k#)
+             ;; we return a hashmap
+             (dissoc (into {} ~(:this method)) k#)
+             ;; otherwise we return a delegator with a delegate without that
+             ;; external key (it is not a field)
+             (let [delegator-fields-map# ~(emit-fields-map
+                                            (:this method)
+                                            (cons 'delegate fields))]
+               (~(map-factory-name delegator-name)
+                  (assoc delegator-fields-map#
+                    :delegate (dissoc ~'delegate
+                                      k#)))))))))
+   ;; keyword look-up
+   (method?| '[clojure.lang.IKeywordLookup getLookupThunk [k]])
+   (fn [m]
+     (assoc m :body
+       `((reify clojure.lang.ILookupThunk
+           (get [~'_thunk ~'_target]
+                (get (merge ~'delegate
+                            ~'this)
+                     ~@(:params m)))))))
+
+   ;; empty
+   (method?| '[clojure.lang.IPersistentCollection empty []])
+   (fn [m]
+     (assoc m :body
+       `((throw (UnsupportedOperationException.
+                  (str "Can't create empty: " ~(str delegator-name)))))))
+
+   ;; withMeta
+   (method?| '[clojure.lang.IObj withMeta [m]])
+   (fn [method]
+     (assoc method :body
+       `((~(map-factory-name delegator-name)
+            (assoc ~(emit-fields-map (:this method) fields)
+              :delegate (.withMeta ~'delegate ~@(:params method)))))))
+   }
+
+  #_[
    ;; Our main strategy is to forward calls to the merge of the delegator and
    ;; its delegate.
    ['[java.util.Map
@@ -107,7 +200,7 @@
          `(~(emit-call m
               (emit-merge-with-delegate m
                 (:this m))))))]
-   
+
    ; seq and associative (except assoc)
    ['[[clojure.lang.Seqable seq []]
       [clojure.lang.Associative containsKey [k]]
@@ -117,21 +210,24 @@
           `(~(emit-call m
                (emit-merge-with-delegate m
                  (emit-fields-map (:this m) fields))))))]
-   
+
    ;; cons
    ['[clojure.lang.IPersistentCollection cons [x]]
     (fn [method]
         (assoc method :body
           `(~(emit-map-operation method delegator-name delegate-name fields
                                  imap-cons))))]
-   
+
    ;; assoc
    ['[clojure.lang.Associative assoc [k v]]
     (fn [method]
-        (assoc method :body
-          `(~(emit-map-operation method delegator-name delegate-name fields
-                                 assoc))))]
-   
+      (assoc method
+        :body
+        `(~(emit-map-operation method delegator-name delegate-name fields
+                               assoc))
+        :protocol 'clojure.lang.IPersistentMap
+        :return-type 'clojure.lang.IPersistentMap))]
+
    ;; without
    ['[clojure.lang.IPersistentMap without [k]]
     (fn [method]
@@ -146,7 +242,7 @@
             (if (contains? common-fields# k#)
               ;; we return a hashmap
               (dissoc (into {} ~(:this method)) k#)
-              ;; otherwise we return a delegator with a delegate without that 
+              ;; otherwise we return a delegator with a delegate without that
               ;; external key (it is not a field)
               (let [delegator-fields-map# ~(emit-fields-map
                                              (:this method)
@@ -155,7 +251,7 @@
                    (assoc delegator-fields-map#
                      :delegate (dissoc ~'delegate
                                        k#)))))))))]
-  
+
    ;; keyword look-up
    ['[clojure.lang.IKeywordLookup getLookupThunk [k]]
     (fn [m]
@@ -165,14 +261,14 @@
                  (get (merge ~'delegate
                              ~'this)
                       ~@(:params m)))))))]
-   
+
    ;; empty
    ['[clojure.lang.IPersistentCollection empty []]
     (fn [m]
       (assoc m :body
         `((throw (UnsupportedOperationException.
                    (str "Can't create empty: " ~(str delegator-name)))))))]
-   
+
    ;; withMeta
    ['[clojure.lang.IObj withMeta [m]]
     (fn [method]
@@ -186,10 +282,10 @@
   [delegator-name delegate-name fields transforms delegator-specs]
   (let [classname delegator-name
         w (with-meta (symbol (str (namespace-munge *ns*) "." delegator-name))
-                     (meta delegator-name))
+            (meta delegator-name))
         transforms (concat (record-transforms
-                               delegator-name delegate-name fields)
-                             transforms)
+                             delegator-name delegate-name fields)
+                           transforms)
         all-methods-transformed (apply-transforms
                                   delegate-name
                                   transforms
@@ -200,7 +296,10 @@
                                      '(clojure.lang.IRecord))]
     (emit-with emit-deftype*
                delegator-name classname
-               delegate-name (conj fields '__meta '__extmap)
+               delegate-name (conj fields
+                                   '__meta '__extmap
+                                   ' ^int ^:unsynchronized-mutable __hash
+                                   ' ^int ^:unsynchronized-mutable __hasheq)
                generated-specs)))
 
 (defn emit-defrecord-delegate

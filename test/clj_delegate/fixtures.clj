@@ -9,7 +9,7 @@
   (method-b [this b]))
 
 (defprotocol ProtocolB
-  (method-c [this c]))
+  (method-c [this c] [this c x]))
 
 (defprotocol TagProtocol)
 
@@ -17,15 +17,24 @@
   (m [a])
   (m [a b]))
 
+(definterface Interface2
+  (mm [a]))
+
+(definterface Interface3
+  (mmm [a]))
+
+(definterface Interface4
+  (mmmm [a]))
+
 (deftype Type [w x y]
   Protocol
   (method [this a] :original)
-  
+
   ProtocolA
   (method-a [this a] :original-a)
   (method-a [this a b] :original-aa)
   (method-b [this b] :original-b)
-  
+
   Object
   (toString [this] "xyz"))
 
@@ -33,10 +42,10 @@
   Interface
   (m [this a]   :original-m1)
   (m [this a b] :original-m2)
-  
+
   Protocol
   (method [this a] :original)
-  
+
   ProtocolA
   (method-a [this a] :original-a)
   (method-a [this a b] :original-aa)

@@ -1,4 +1,5 @@
 (ns clj-delegate.core-test
+  (:use clojure.pprint)
   (:require [clojure.test :refer :all]
             [clj-delegate.core :refer :all]
             [clj-delegate.fixtures :refer [Protocol ProtocolA ProtocolB
@@ -6,21 +7,47 @@
             [shuriken.core :refer [thrown?]])
   (:import [clj_delegate.fixtures Type Record Interface]))
 
+; (pprint
+;   (macroexpand
+;     '(defdelegate DelegateType Type [z]
+;       Protocol
+;       (method [this a] :overriden)
+
+;       ProtocolA
+;       (method-a [this a] :overriden-a)
+
+;       ProtocolB
+;       (method-c [this c] :value))))
+
 (defdelegate DelegateType Type [z]
   Protocol
   (method [this a] :overriden)
-  
+
   ProtocolA
   (method-a [this a] :overriden-a)
-  
+
   ProtocolB
   (method-c [this c] :value))
 
 (deftest test-delegate-a-type
   (let [deleg (DelegateType. (Type. 1 2 3) 4)]
-    (testing "inheritance"
-      (is (isa? (class deleg) Type))
-      (is (isa? (class deleg) DelegateType)))
+    (testing "inheritance & delegation"
+      (testing "delegates?"
+        (is (delegates? (class deleg) Type)))
+      (testing "instance-delegates?"
+        (is (instance-delegates? Type deleg)))
+      (testing "delegates-or-isa?"
+        (is (delegates-or-isa? (class deleg) Type))
+        (is (delegates-or-isa? (class deleg) Object)))
+      (testing "instance-delegates-or-isa?"
+        (is (instance-delegates-or-isa? Type deleg))
+        (is (instance-delegates-or-isa? Object deleg)))
+      (testing "with-delegates + isa?"
+        (with-delegates
+          (is (isa? (class deleg) Type))
+          (is (isa? (class deleg) Object))
+          (is (instance? Type deleg))
+          (is (instance? Object deleg)))))
     (testing "methods"
       (testing "multiple interfaces or protocols"
         (is (= :value (.method-c deleg :_))))
@@ -39,14 +66,62 @@
           (is (= 4 (.z deleg))))))))
 
 (defdelegate DelegateRecord Record [d]
+      Interface
+      (m [this a] :overriden-m1)
+
+      ProtocolA
+      (^Object method-a [this a] :overriden-a)
+
+      Object
+      (toString [this] "abc"))
+
+(defdelegate DelegateRecord Record [d]
   Interface
   (m [this a] :overriden-m1)
-  
+
   ProtocolA
-  (method-a [this a] :overriden-a)
-  
+  (^Object method-a [this a] :overriden-a)
+
   Object
   (toString [this] "abc"))
+
+; (deftype*
+;   clj-delegate.core-test/CustomRecord
+;   clj_delegate.core_test.CustomRecord
+;   [delegate
+;    __meta
+;    __extmap
+;    ^int ^:unsynchronized-mutable __hash
+;    ^int ^:unsynchronized-mutable __hasheq
+;    ]
+;   :implements
+;   [clojure.lang.IPersistentMap
+;    java.util.Map]
+;   (^void forEach
+;          [this ^java.util.function.Consumer aa]
+;          (.forEach (clojure.core/merge delegate this) aa))
+;   (^void forEach
+;          [this ^java.util.function.BiConsumer aa]
+;          (.forEach (clojure.core/merge delegate this) aa)))
+
+; (println "3----------------------------------------->")
+
+; (deftype*
+;   clj-delegate.core-test/CustomDelegate
+;   clj_delegate.core_test.CustomDelegate
+;   [delegate d __meta __extmap hack
+;    ; ^int ^:unsynchronized-mutable __hash
+;    ; ^int ^:unsynchronized-mutable __hasheq
+;    ]
+;   :implements
+;   [clojure.lang.IPersistentMap
+;    java.util.Map]
+;   (^void forEach
+;          [this ^java.util.function.Consumer aa]
+;          (.forEach (clojure.core/merge delegate this) aa))
+;   (^void forEach
+;          [this ^java.util.function.BiConsumer aa]
+;          (.forEach (clojure.core/merge delegate this) aa)))
 
 (deftest test-delegate-a-record
   (let [rec (Record. 1 2 3)
@@ -204,3 +279,5 @@
         (is (not (thrown? Throwable
                    (defdelegate ADelegate3 clj_delegate.fixtures.Record
                      []))))))))
+
+(run-tests)
