@@ -5,7 +5,7 @@ Define delegates around types and records.
 ## Usage
 
 ```clojure
-[clj-delegate "0.1.4"]
+[clj-delegate "0.1.5"]
 ```
 
 
