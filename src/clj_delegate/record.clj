@@ -1,5 +1,4 @@
 (ns clj-delegate.record
-  (:use clojure.pprint)
   (:require [clj-delegate.machinery :refer :all]
             [clj-delegate.specs :refer [merge-specs]]
             [clj-delegate.transforms
@@ -285,7 +284,7 @@
             (meta delegator-name))
         transforms (concat (record-transforms
                              delegator-name delegate-name fields)
-                           transforms)
+                           (map eval transforms))
         all-methods-transformed (apply-transforms
                                   delegate-name
                                   transforms

@@ -1,7 +1,11 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## [0.1.5] - 2002-09-15
+## [0.1.6] - 2023-08-15
+### Changed
+- Refactored the way transforms are handled.
+
+## [0.1.5] - 2022-09-15
 ### Fixed
 - Minor bug
 

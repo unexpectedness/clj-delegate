@@ -1,4 +1,4 @@
-(defproject clj-delegate "0.1.5"
+(defproject clj-delegate "0.1.6"
   :description "Define delegates around types and records"
   :url "https://github.com/unexpectedness/clj-delegate"
   :license {:name "Eclipse Public License"

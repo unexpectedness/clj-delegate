@@ -1,5 +1,4 @@
 (ns clj-delegate.reflect
-  (:use clojure.pprint)
   (:refer-clojure :exclude [methods satisfies? find-protocol-impl])
   (:require [clojure.reflect :refer [reflect]]
             [clojure.set :as set]

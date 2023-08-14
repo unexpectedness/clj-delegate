@@ -1,5 +1,4 @@
 (ns clj-delegate.specs-test
-  (:use clojure.pprint)
   (:require [clojure.test :refer :all]
             [clj-delegate.specs :refer :all]
             [clj-delegate.reflect :as reflect :refer [caching-all-protocols]]

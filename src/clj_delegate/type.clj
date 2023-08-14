@@ -1,5 +1,4 @@
 (ns clj-delegate.type
-  (:use clojure.pprint)
   (:require [clj-delegate.machinery :refer :all]
             [clj-delegate.specs :refer [merge-specs]]
             [clj-delegate.transforms :refer [apply-transforms]]

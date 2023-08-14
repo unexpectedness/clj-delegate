@@ -1,5 +1,4 @@
 (ns clj-delegate.core-test
-  (:use clojure.pprint)
   (:require [clojure.test :refer :all]
             [clj-delegate.core :refer :all]
             [clj-delegate.fixtures :refer [Protocol ProtocolA ProtocolB
@@ -8,20 +7,9 @@
             [clj-delegate.reflect :reload true]
             [clj-delegate.specs :reload true]
             [clj-delegate.type :reload true]
-            [clj-delegate.machinery :reload true])
+            [clj-delegate.machinery :reload true]
+            [clj-delegate.transforms :reload true])
   (:import [clj_delegate.fixtures Type Record Interface]))
-
-; (pprint
-;   (macroexpand
-;     '(defdelegate DelegateType Type [z]
-;       Protocol
-;       (method [this a] :overriden)
-
-;       ProtocolA
-;       (method-a [this a] :overriden-a)
-
-;       ProtocolB
-;       (method-c [this c] :value))))
 
 (defdelegate DelegateType Type [z]
   Protocol
@@ -269,3 +257,26 @@
         (is (not (thrown? Throwable
                    (defdelegate ADelegate3 clj_delegate.fixtures.Record
                      []))))))))
+
+
+(defprotocol ProtoForTransforms
+  (method-a [this])
+  (method-b [this]))
+
+(defrecord RecordForTransforms []
+  ProtoForTransforms
+  (method-a [this] :original)
+  (method-b [this] :original))
+
+(defdelegate DelegateForTransforms RecordForTransforms []
+  {(method?| '[ProtoForTransforms method-a []])
+   (literally| '(method-a [_] :delegate))}
+  
+  ProtoForTransforms
+  (method-b [this] :delegate))
+
+(deftest test-transforms
+  (let [r (RecordForTransforms.)
+        d (DelegateForTransforms. r)]
+    (is (= :delegate (.method-a d)))
+    (is (= :delegate (.method-b d)))))

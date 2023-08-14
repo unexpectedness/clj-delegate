@@ -1,5 +1,4 @@
 (ns clj-delegate.specs
-  (:use clojure.pprint)
   (:require [clj-delegate.reflect :refer [parameter-names signature all-methods
                                           caching-all-protocols qualify-type]]
             [clojure.main :refer [demunge]]
@@ -100,16 +99,14 @@
                           ~@(for [{:keys [name params this body return-type
                                           parameter-types] :as m}
                                   methods]
-                              (do #_(pprint m)
-                                  
-                                  (concat
-                                   [(with-meta name {:tag (qualify-type 
-                                                           (:declaring-class m) return-type)})
-                                    (vec (cons (with-meta this {:tag delegate})
-                                               (map #(with-meta %1 {:tag (qualify-type
-                                                                          (:declaring-class m) %2)})
-                                                    params parameter-types)))]
-                                   body))))))))
+                              (concat
+                               [(with-meta name {:tag (qualify-type
+                                                       (:declaring-class m) return-type)})
+                                (vec (cons (with-meta this {:tag delegate})
+                                           (map #(with-meta %1 {:tag (qualify-type
+                                                                      (:declaring-class m) %2)})
+                                                params parameter-types)))]
+                               body)))))))
             {:format :deftype-specs})))))
 
 (defn merge-specs [delegate & args]

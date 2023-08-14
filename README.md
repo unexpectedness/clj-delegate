@@ -5,7 +5,7 @@ Define delegates around types and records.
 ## Usage
 
 ```clojure
-[clj-delegate "0.1.5"]
+[clj-delegate "0.1.6"]
 ```
 
 
@@ -17,43 +17,43 @@ Define delegates around types and records.
 ## Example
 
 ```clojure
-(defprotocol MyProtocol
-  (my-method [this])
-  (my-other-method [this]))
+(defprotocol SalutationP
+  (greet [this])
+  (farewell [this]))
 
-(defrecord MyRecord [a b c]
-  MyProtocol
-  (my-method [this]
+(defrecord French [a b c]
+  SalutationP
+  (greet [this]
     :bonjour)
-  (my-other-method [this]
+  (farewell [this]
     :au-revoir))
 
-(defdelegate MyDelegate MyRecord [d]
+(defdelegate ForcedEnglishFarewell French [d]
   MyProtocol
-  (my-other-method [this]
+  (farewell [this]
     :goodbye))
 
-(let [record   (MyRecord. 1 2 3)
-      delegate (MyDelegate. record 4)]
+(let [record   (French. 1 2 3)
+      delegate (ForcedEnglishFarewell. record 4)]
   ;; A record delegate is a record like any other record that stores
   ;; a delegate instance and supplementary fields.
   (println delegate)
-  ;; => #clj_delegate.core_test.MyDelegate{:a 1, :b 2, :c 3, :d 4}
+  ;; => #clj_delegate.core_test.ForcedEnglishFarewell{:a 1, :b 2, :c 3, :d 4}
 
   ;; The underlying instance stays accessible as the `delegate' field
   (println (.delegate delegate))
-  ;; => #clj_delegate.explorations.MyRecord{:a 1, :b 2, :c 3}
+  ;; => #clj_delegate.explorations.French{:a 1, :b 2, :c 3}
 
   ;; Note that this special field is not accessible via a keyword lookup
   (println (:delegate delegate))
   ;; => nil
 
   ;; Original methods are callable
-  (println (.my-method delegate))
+  (println (.greet delegate))
   ;; => bonjour
 
   ;; And can be redefined at will
-  (println (.my-other-method delegate))
+  (println (.farewell delegate))
   ;; => goodbye
 
   ;; The same goes for fields : delegate fields are directly accessible to the
@@ -71,18 +71,18 @@ Define delegates around types and records.
   ;; impacts the underlying delegate. Here is an example using 'assoc'.
   ;; The same logic follows with dissoc, conj, cons, with-meta, etc...
   (println (.delegate (assoc delegate :x :y)))
-  ;; => #clj_delegate.explorations.MyRecord{:a 1, :b 2, :c 3, :x :y}
+  ;; => #clj_delegate.explorations.French{:a 1, :b 2, :c 3, :x :y}
 
   ;; More importantly, delegates are equal to the instance they wrap.
   (println (= delegate record))
   ;; => true
 
   ;; And derive from it in the default isa? hierarchy
-  (println (isa? MyDelegate MyRecord))
+  (println (isa? ForcedEnglishFarewell French))
   ;; => true
 
   ;; By default all methods are forwarded to the delegate
-  (println (meta (MyDelegate. (with-meta (MyRecord. 1 2 3)
+  (println (meta (ForcedEnglishFarewell. (with-meta (French. 1 2 3)
                                          {:a :aa})
                               4)))
   ;; => {:a :aa}
@@ -94,65 +94,59 @@ Define delegates around types and records.
 
 ## Transforms
 
-Alternatively a `transforms` argument can be passed to `defdelegate`:
+Alternatively a `transforms` argument can be passed to `defdelegate` as
+a vector or map of matcher/transformer pairs. Place it just after the arg vector.
 
 ```clojure
-(defdelegate MyDelegate MyRecord [field1 field2]
+(defdelegate ForcedEnglishFarewell French [field1 field2]
   [[matcher1 transformer1]
-   [matcher2 transformer2]])
+   [matcher2 transformer2]]
+   (... optional body in the style of deftype))
 ```
 
-A matcher can be :
-- a list of matchers
-- the fully qualified symbol of a class name
-- a method signature triplet of the form:
-  `[fully-qualified-class-symbol method-name param-names]`
-  `'[clojure.lang.IObj withMeta [m]]`
-  Note that only the number of parameters and not their name matter in the
-  signature.
-- a function accepting one method-descriptor as argument which should return
-  true when the transformer should be applied to this method.
-
-A transformer can either be :
-- a function accepting a method-descriptor as argument that modifies then
-  returns it.
-- quoted clojure code as a replacement for the method's existing implementation.
-- the nil or false value
-
-These matcher/transformer pairs will be used to process the existing methods
-of the delegate in order to adapt them. Whenever a matcher matches a
-method, the corresponding transformer is run against it.
-If the transformer is or returns `nil`/`false` the method is removed from
-the delegate implementation.
-Note that transformers can return a method descriptor or clojure quoted code.
-
-Example:
+Example inspired from the source. This handles smooth integration with records so that `assoc`, `get`, etc work on the merge of the
+delegate and the wrapped record:
 
 ```clojure
-[
-   ;; Our main strategy is to forward calls to the merge of the delegate and
-   ;; its delegate.
-   ['[java.util.Map
-      clojure.lang.IHashEq
-      clojure.lang.ILookup
-      [clojure.lang.IPersistentCollection count []]
-      [clojure.lang.IPersistentCollection equiv []]
-      java.io.Serializable
-      java.lang.Iterable]
-    (fn [m]
-       (assoc m :body
-         `(~(emit-call m
-              (emit-merge-with-delegate m
-                (:this m))))))]
-
-   ; seq and associative (except assoc)
-   ['[[clojure.lang.Seqable seq []]
-      [clojure.lang.Associative containsKey [k]]
-      [clojure.lang.Associative entryAt [k]]]
-    (fn [m]
-        (assoc m :body
-          `(~(emit-call m
-               (emit-merge-with-delegate m
-                 (emit-fields-map (:this m) fields))))))]
-]
+(defdelegate ExampleDelegate WrappedRecord [arg]
+  {(or| (abstraction?| java.util.Map
+                       clojure.lang.IHashEq
+                       clojure.lang.ILookup
+                       java.io.Serializable
+                       java.lang.Iterable)
+        (method?| '[clojure.lang.IPersistentCollection count []]
+                  '[clojure.lang.IPersistentCollection equiv []]))
+   (fn [m]
+     (assoc m :body
+       `(~(emit-call
+            m (emit-merge-with-delegate
+                m (:this m))))))})
 ```
+
+Other example from the tests:
+
+```clojure
+(defdelegate DelegateForTransforms RecordForTransforms []
+  {(method?| '[ProtoForTransforms method-a []])
+   (literally| '(method-a [_] :delegate))}
+  
+  ProtoForTransforms
+  (method-b [this] :delegate))
+```
+
+Notes:
+- You can compose the functions produced by `abtraction?|`and so on using `and|`, `or|`, `not|` and other functional combinators.
+- the map `m` the transformer function work on look like this:
+
+```clojure
+{:name method-a,
+ :declaring-class clj_delegate.core_test.RecordForTransforms,
+ :protocol clj-delegate.core-test/ProtoForTransforms,
+ :params [],
+ :parameter-types [],
+ :return-type java.lang.Object,
+ :this this,
+ :body ((.method-a (.delegate this)))}
+ ```
+
+ - For more examples about transforms check how the fusion of delegates with records is handled [in the source](https://github.com/unexpectedness/clj-delegate/blob/d3ac3d514a508ae8e7e8d3b7f4bef86d3468c861/src/clj_delegate/record.clj#L96).

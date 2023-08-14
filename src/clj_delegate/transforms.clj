@@ -1,5 +1,4 @@
 (ns clj-delegate.transforms
-  (:use clojure.pprint)
   (:require [weaving.core]
             [shuriken.associative :refer [index-by]]
             [clj-delegate.specs   :refer [to-deftype-specs to-local-format]]
@@ -8,6 +7,7 @@
 (def or|  weaving.core/or|)
 (def and| weaving.core/and|)
 (def not| weaving.core/not|)
+(def ->|  weaving.core/->|)
 
 (defn abstraction?|
   "Returns a method descriptor predicate that returns true if it
@@ -31,14 +31,15 @@
   For now, only the number of args in `args-vec` is taken into account."
   [& signatures]
   (fn [m]
-    (some (fn [sign]
-            (let [[protocol name args] sign]
-              (and (= (maybe-resolve (:protocol m)) (maybe-resolve protocol))
-                   (= (:name m) name)
+    (let [ret (some (fn [sign]
+                      (let [[protocol name args] sign]
+                        (and (= (maybe-resolve (:protocol m)) (maybe-resolve protocol))
+                             (= (:name m) name)
                    ;; TODO: allow to filter by arg type
-                   (= (-> m :params count)
-                      (count args)))))
-          signatures)))
+                             (= (-> m :params count)
+                                (count args)))))
+                    signatures)]
+      ret)))
 
 ;; TODO: one day we'll want to support proxy specs as well
 (defn literally|
@@ -47,6 +48,7 @@
   [method-spec]
   (fn [m]
     (let [[name argvec & body] method-spec]
+      
       (assoc m
         :name name
         :this (first argvec)

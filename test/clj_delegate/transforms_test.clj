@@ -1,6 +1,5 @@
 (ns clj-delegate.transforms-test
   (:refer-clojure :exclude [methods])
-  (:use clojure.pprint)
   (:require [clojure.test :refer :all]
             [clj-delegate.specs :refer [to-local-format to-deftype-specs]]
             [clj-delegate.transforms :refer :all]
