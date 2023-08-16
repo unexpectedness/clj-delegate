@@ -1,7 +1,9 @@
 (ns clj-delegate.machinery
-  (:require [shuriken.namespace :refer [fully-qualify]]
+  (:require [clojure.string :as str]
+            [shuriken.namespace :refer [fully-qualify]]
             [clj-delegate.reflect
-             :refer [get-basis native-record-interfaces qualify-type]
+             :refer [get-basis interface? protocol?
+                     native-record-interfaces]
              :as reflect]
             [clj-delegate.derive :refer [derive-delegate]]
             [clj-delegate.specs :refer [merge-specs to-local-format]]
@@ -29,11 +31,18 @@
         string
         (str *ns* \/ string)))))
 
+(defn delegate-fields-protocol-name [delegate]
+  (-> delegate name
+      (str/split #"\.")
+      last
+      (str "Fields")
+      symbol))
+
 (def emit-deftype* @#'clojure.core/emit-deftype*)
 
 (defn emit-delegate-fields-accessors [delegate]
   (let [fields (-> delegate resolve get-basis)]
-    `(~(symbol (str delegate "Fields"))
+    `(~(symbol (delegate-fields-protocol-name delegate))
         ~@(map (fn [field]
                  `(~(with-meta field {}) [~'this]
                           (~(symbol (str "." field))
@@ -45,10 +54,9 @@
                                      (emit-delegate-fields-accessors delegate)
                                      delegator-specs)
         local (->> (to-local-format delegate generated-specs)
-                   (remove (fn [m]
-                             (let [proto (:protocol m)]
-                               (or (native-record-interfaces proto)
-                                   ('#{java.lang.Object} proto))))))
+                   (filter
+                    (->| val :protocol
+                         (or| protocol? interface? '#{java.lang.Object}))))
         protocols (->> local
                        (map (comp :protocol val))
                        distinct
@@ -84,7 +92,7 @@
 
 (defn define-delegate-fields-protocol [delegate]
   (let [fields (-> delegate resolve get-basis)]
-    (eval `(defprotocol ~(symbol (str delegate "Fields"))
+    (eval `(defprotocol ~(delegate-fields-protocol-name delegate)
              ~@(map (fn [field]
                       `(~(with-meta field {}) [~'this]))
                     fields)))

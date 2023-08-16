@@ -63,44 +63,6 @@
   Object
   (toString [this] "abc"))
 
-; (deftype*
-;   clj-delegate.core-test/CustomRecord
-;   clj_delegate.core_test.CustomRecord
-;   [delegate
-;    __meta
-;    __extmap
-;    ^int ^:unsynchronized-mutable __hash
-;    ^int ^:unsynchronized-mutable __hasheq
-;    ]
-;   :implements
-;   [clojure.lang.IPersistentMap
-;    java.util.Map]
-;   (^void forEach
-;          [this ^java.util.function.Consumer aa]
-;          (.forEach (clojure.core/merge delegate this) aa))
-;   (^void forEach
-;          [this ^java.util.function.BiConsumer aa]
-;          (.forEach (clojure.core/merge delegate this) aa)))
-
-; (println "3----------------------------------------->")
-
-; (deftype*
-;   clj-delegate.core-test/CustomDelegate
-;   clj_delegate.core_test.CustomDelegate
-;   [delegate d __meta __extmap hack
-;    ; ^int ^:unsynchronized-mutable __hash
-;    ; ^int ^:unsynchronized-mutable __hasheq
-;    ]
-;   :implements
-;   [clojure.lang.IPersistentMap
-;    java.util.Map]
-;   (^void forEach
-;          [this ^java.util.function.Consumer aa]
-;          (.forEach (clojure.core/merge delegate this) aa))
-;   (^void forEach
-;          [this ^java.util.function.BiConsumer aa]
-;          (.forEach (clojure.core/merge delegate this) aa)))
-
 (deftest test-delegate-a-record
   (let [rec (Record. 1 2 3)
         deleg (DelegateRecord. rec 4)]
@@ -291,3 +253,12 @@
         fo (FunnyObject. o 1)]
     (is (= 1 (.a fo)))
     (is (= "Ahahah" (.toString fo)))))
+
+;; We test this compiles
+(defdelegate AtomWithMeta clojure.lang.Atom [m]
+  clojure.lang.IMeta
+  (meta [this]
+        (.meta delegate))
+  clojure.lang.IObj
+  (withMeta [this newmeta]
+            (AtomWithMeta. (.delegate this) newmeta)))

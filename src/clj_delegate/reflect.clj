@@ -53,6 +53,12 @@
                    y alphabet]
                (symbol (str x y))))))
 
+(defn interface? [x]
+  (-> (maybe-resolve x)
+      clojure.reflect/reflect
+      :flags
+      (contains? :interface)))
+
 (defn protocol? [symbol-or-proto]
   (let [proto (if (symbol? symbol-or-proto)
                 (try

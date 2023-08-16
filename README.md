@@ -5,7 +5,7 @@ Define delegates around Clojure types, records and Java classes.
 ## Usage
 
 ```clojure
-[clj-delegate "0.1.6"]
+[clj-delegate "0.1.8"]
 ```
 
 
