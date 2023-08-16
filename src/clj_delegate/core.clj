@@ -25,5 +25,5 @@
        ~(if (is-record? delegate)
           (emit-defrecord-delegate
             name delegate fields transforms delegator-specs)
-          (emit-deftype-delegate
+          (emit-deftype-delegate ;; Will handle delegation to java classes too.
             name delegate fields transforms delegator-specs)))))

@@ -280,3 +280,14 @@
         d (DelegateForTransforms. r)]
     (is (= :delegate (.method-a d)))
     (is (= :delegate (.method-b d)))))
+
+
+(defdelegate FunnyObject Object [a]
+  Object
+  (toString [this] "Ahahah"))
+
+(deftest test-java-class
+  (let [o  (Object.)
+        fo (FunnyObject. o 1)]
+    (is (= 1 (.a fo)))
+    (is (= "Ahahah" (.toString fo)))))

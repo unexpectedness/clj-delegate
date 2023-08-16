@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## [0.1.7] - 2023-08-16
+### Added
+- Delegation for Java classes.
+
 ## [0.1.6] - 2023-08-15
 ### Changed
 - Refactored the way transforms are handled.

@@ -9,7 +9,8 @@
             [shuriken.tree :refer [tree-seq-breadth]]
             [shuriken.associative :refer [index-by]]
             [threading.core :refer :all]
-            [weaving.core :refer :all]))
+            [weaving.core :refer :all]
+            [clojure.main :as m]))
 
 (def native-record-interfaces
   '#{clojure.lang.IRecord
@@ -116,7 +117,12 @@
           (all-protocols)))
 
 (defn get-basis [x]
-  (. (. (ensure-class x) getMethod "getBasis" nil) invoke nil nil))
+  (when-let [m (try (. (ensure-class x) getMethod "getBasis" nil)
+                    (catch NoSuchMethodException _
+                      nil))]
+    (if m
+      (. m invoke nil nil)
+      [])))
 
 (defn is-record? [sym]
   (contains? (:bases (reflect (resolve sym)))

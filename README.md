@@ -1,6 +1,6 @@
 # clj-delegate
 
-Define delegates around types and records.
+Define delegates around Clojure types, records and Java classes.
 
 ## Usage
 
