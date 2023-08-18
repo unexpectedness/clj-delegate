@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## [0.1.9] - 2023-08-18
+### Fixed
+- Bug in `reflect/protocols?` that would try to perform map-accesses on non-maps.
+
 ## [0.1.8] - 2023-08-16
 ### Fixed
 - Only interfaces and protocols are allowed in defrecord & deftype.

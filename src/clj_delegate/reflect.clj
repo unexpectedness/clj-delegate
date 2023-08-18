@@ -63,13 +63,14 @@
   (let [proto (if (symbol? symbol-or-proto)
                 (try
                   (-> symbol-or-proto resolve deref)
-                  (catch Throwable t))
+                  (catch Throwable _))
                 symbol-or-proto)]
-    (try
-      (set/subset? #{:method-builders :method-map :on :on-interface :sigs :var}
-                   (-> proto keys set))
-      (catch Throwable t
-        false))))
+    (when (map? proto)
+      (try
+        (set/subset? #{:method-builders :method-map :on :on-interface :sigs :var}
+                     (-> proto keys set))
+        (catch Throwable _
+          false)))))
 
 (def pref
   @#'clojure.core/pref)

@@ -1,4 +1,4 @@
-(defproject clj-delegate "0.1.8"
+(defproject clj-delegate "0.1.9"
   :description "Define delegates around Clojure types, records and Java classes."
   :url "https://github.com/unexpectedness/clj-delegate"
   :license {:name "Eclipse Public License"
